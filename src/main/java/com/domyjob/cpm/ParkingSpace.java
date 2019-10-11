@@ -5,23 +5,31 @@ import org.springframework.stereotype.Component;
 @Component
 public class ParkingSpace {
 
-    private int id;
-    // true for parked and false for un-parked
-    private boolean state;
+    private String id;
+    private String licensePlate;
+    private String state;
 
-    public int getId() {
+    public String getId() {
         return id;
     }
 
-    public void setId(int id) {
+    public void setId(String id) {
         this.id = id;
     }
 
-    public boolean isState() {
+    public String getLicensePlate() {
+        return licensePlate;
+    }
+
+    public void setLicensePlate(String licensePlate) {
+        this.licensePlate = licensePlate;
+    }
+
+    public String getState() {
         return state;
     }
 
-    public void setState(boolean state) {
+    public void setState(String state) {
         this.state = state;
     }
 }
