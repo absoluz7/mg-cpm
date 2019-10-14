@@ -37,6 +37,7 @@ public class ParkingService {
     //Initialises empty car park and file reader
     public void initParkingSystem() {
         parkingSpaces = new LinkedList<>();
+      //TODO intStream
         for (int i=1; i<=10; i++) {
             ParkingSpace parkingSpace = new ParkingSpace();
             parkingSpace.setId("P" + i);
@@ -51,7 +52,7 @@ public class ParkingService {
     private void processParkCommands() {
         List<String> commands = getParkCommands();
         commands.forEach(command -> {
-            LOG.info("Command is " + command);
+//            LOG.info("Command is " + command);
             switch (command.substring(0,1)) {
                 case "p":
                     parkCar(command);
@@ -71,22 +72,29 @@ public class ParkingService {
         String filePath = "parking/park1.txt";
 
         List<String> parkCommands = new LinkedList<>();
-        Stream<String> stream = null;
+        Stream<String> stream = Stream.of("");
         try {
-            LOG.info("Reading Park File from " + filePath);
+            LOG.info("Reading Park File from {}", filePath);
             Path path = Paths.get(getClass().getClassLoader().getResource(filePath).toURI());
             stream = Files.lines(path);
             stream.flatMap(string -> Stream.of(string.split(","))).forEach(parkCommands::add);
         } catch (IOException | URISyntaxException exception) {
-            LOG.info("Encountered problems reading " + filePath + " , check the error log ");
-            exception.printStackTrace();
+            LOG.info("Encountered problems reading {}, check the error log: /n {}", filePath, exception);
+        } finally {
+            stream.close();
         }
         return parkCommands;
     }
 
-    private Long parkCar(String command) {
-        parkingSpaces.forEach(space -> {
+    /**
+     * Parks a car based on license plate and returns a ticket number
+     * @param command
+     * @return
+     */
+    private void parkCar(String command) {
+        for (ParkingSpace space : parkingSpaces) {
             if (!space.getState()) {
+                int spaceNumber = Integer.parseInt(space.getId().substring(1))-1;
                 Car car = new Car();
                 car.setLicensePlate(command.substring(1));
 
@@ -96,25 +104,35 @@ public class ParkingService {
 
                 space.setCar(car);
                 space.setTicket(ticket);
-                LOG.info("PARKED - Car with license plate: " + space.getCar().getLicensePlate() + " in space: " + space.getId());
-                return;
+                space.setState(true);
+                parkingSpaces.set(spaceNumber, space);
+                LOG.info("PARKED - Car with license plate: {} in space: {}", space.getCar().getLicensePlate(), space.getId());
+                break;
             }
-        });
-        return currentTicketNumber-1;
+        }
     }
 
     private void unparkCar(String command) {
-        parkingSpaces.forEach(space -> {
-            if (command.substring(1).equals(space.getTicket().getTicketNumber())) {
-                LOG.info("UNPARKED - Car with license plate: " + space.getCar().getLicensePlate() + " from space: " + space.getId());
+        for (ParkingSpace space : parkingSpaces) {
+            if (Long.valueOf(command.substring(1)).equals(space.getTicket().getTicketNumber())) {
+                int spaceNumber = Integer.parseInt(space.getId().substring(1))-1;
+                LOG.info("UNPARKED - Car with license plate: {} from space: {}", space.getCar().getLicensePlate(), space.getId());
                 space.setCar(new Car());
                 space.setTicket(new Ticket());
+                space.setState(false);
+                parkingSpaces.set(spaceNumber, space);
+                break;
             }
-        });
+        }
     }
 
     private void compactCarPark(String command) {
+        for (ParkingSpace space : parkingSpaces) {
+            if (!space.getState()) {
+                int spaceNumber = Integer.parseInt(space.getId().substring(1))-1;
 
+            }
+        }
     }
 
 }
