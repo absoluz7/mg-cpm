@@ -6,8 +6,9 @@ import org.springframework.stereotype.Component;
 public class ParkingSpace {
 
     private String id;
-    private String licensePlate;
-    private String state;
+    private boolean state;
+    private Car car;
+    private Ticket ticket;
 
     public String getId() {
         return id;
@@ -17,19 +18,27 @@ public class ParkingSpace {
         this.id = id;
     }
 
-    public String getLicensePlate() {
-        return licensePlate;
-    }
-
-    public void setLicensePlate(String licensePlate) {
-        this.licensePlate = licensePlate;
-    }
-
-    public String getState() {
+    public boolean getState() {
         return state;
     }
 
-    public void setState(String state) {
+    public void setState(boolean state) {
         this.state = state;
+    }
+
+    public Car getCar() {
+        return car;
+    }
+
+    public void setCar(Car car) {
+        this.car = car;
+    }
+
+    public Ticket getTicket() {
+        return ticket;
+    }
+
+    public void setTicket(Ticket ticket) {
+        this.ticket = ticket;
     }
 }
