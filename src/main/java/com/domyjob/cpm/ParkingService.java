@@ -1,18 +1,10 @@
 package com.domyjob.cpm;
 
-import com.sun.org.apache.bcel.internal.util.ClassPath;
-import com.sun.org.apache.xerces.internal.xs.StringList;
-import org.apache.logging.log4j.util.Strings;
+import com.sun.org.apache.xalan.internal.xsltc.util.IntegerArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.core.io.ClassPathResource;
-import org.springframework.core.io.InputStreamResource;
-import org.springframework.core.io.Resource;
-import org.springframework.core.io.ResourceLoader;
 import org.springframework.stereotype.Component;
 import org.springframework.stereotype.Service;
-import org.springframework.util.ResourceUtils;
 
 import java.io.*;
 import java.net.URISyntaxException;
@@ -20,7 +12,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 @Service
@@ -29,30 +21,25 @@ public class ParkingService {
     private static Logger LOG = LoggerFactory.getLogger(ParkingService.class);
 
     private long currentTicketNumber = 5000;
-    private List<ParkingSpace> parkingSpaces;
-    private Car car;
-    private Ticket ticket;
-    private ParkingSpace parkingSpace;
+    private LinkedList<ParkingSpace> parkingSpaces;
 
     //Initialises empty car park and file reader
     public void initParkingSystem() {
         parkingSpaces = new LinkedList<>();
-      //TODO intStream
-        for (int i=1; i<=10; i++) {
+        IntStream.range(1, 11).forEach(i -> {
             ParkingSpace parkingSpace = new ParkingSpace();
             parkingSpace.setId("P" + i);
             parkingSpace.setState(false);
             parkingSpace.setCar(new Car());
             parkingSpace.setTicket(new Ticket());
             parkingSpaces.add(parkingSpace);
-        }
+        });
         processParkCommands();
     }
 
     private void processParkCommands() {
-        List<String> commands = getParkCommands();
+        LinkedList<String> commands = getParkCommands();
         commands.forEach(command -> {
-//            LOG.info("Command is " + command);
             switch (command.substring(0,1)) {
                 case "p":
                     parkCar(command);
@@ -61,17 +48,19 @@ public class ParkingService {
                     unparkCar(command);
                     break;
                 case "c":
-                    compactCarPark(command);
+                    compactCarPark();
                     break;
             }
         });
     }
 
-    //Reads file with parking commands
-    private List<String> getParkCommands() {
+    /**
+     * Reads file with parking commands
+     */
+    private LinkedList<String> getParkCommands() {
         String filePath = "parking/park1.txt";
 
-        List<String> parkCommands = new LinkedList<>();
+        LinkedList<String> parkCommands = new LinkedList<>();
         Stream<String> stream = Stream.of("");
         try {
             LOG.info("Reading Park File from {}", filePath);
@@ -87,52 +76,69 @@ public class ParkingService {
     }
 
     /**
-     * Parks a car based on license plate and returns a ticket number
+     * Parks a car based on license plate
      * @param command
-     * @return
      */
     private void parkCar(String command) {
-        for (ParkingSpace space : parkingSpaces) {
-            if (!space.getState()) {
-                int spaceNumber = Integer.parseInt(space.getId().substring(1))-1;
-                Car car = new Car();
-                car.setLicensePlate(command.substring(1));
+        ParkingSpace parkingSpace = parkingSpaces.stream()
+            .filter(space -> !space.getState())
+            .findFirst()
+            .orElseThrow(() -> new NoSuchElementException("Car park full, wait for space to become available."));
 
-                Ticket ticket = new Ticket();
-                ticket.setTicketNumber(currentTicketNumber);
-                currentTicketNumber++;
+        int spaceNumber = Integer.parseInt(parkingSpace.getId().substring(1))-1;
+        Car car = new Car();
+        car.setLicensePlate(command.substring(1));
 
-                space.setCar(car);
-                space.setTicket(ticket);
-                space.setState(true);
-                parkingSpaces.set(spaceNumber, space);
-                LOG.info("PARKED - Car with license plate: {} in space: {}", space.getCar().getLicensePlate(), space.getId());
-                break;
-            }
-        }
+        Ticket ticket = new Ticket();
+        ticket.setTicketNumber(currentTicketNumber);
+        currentTicketNumber++;
+
+        parkingSpace.setCar(car);
+        parkingSpace.setTicket(ticket);
+        parkingSpace.setState(true);
+        parkingSpaces.set(spaceNumber, parkingSpace);
+        LOG.info("PARKED - Car with license plate: {} in space: {} with ticket number: {}",
+            parkingSpace.getCar().getLicensePlate(), parkingSpace.getId(), parkingSpace.getTicket().getTicketNumber());
     }
 
+    /**
+     * Unparks a car based on the ticket number
+     * @param command
+     */
     private void unparkCar(String command) {
-        for (ParkingSpace space : parkingSpaces) {
-            if (Long.valueOf(command.substring(1)).equals(space.getTicket().getTicketNumber())) {
-                int spaceNumber = Integer.parseInt(space.getId().substring(1))-1;
-                LOG.info("UNPARKED - Car with license plate: {} from space: {}", space.getCar().getLicensePlate(), space.getId());
-                space.setCar(new Car());
-                space.setTicket(new Ticket());
-                space.setState(false);
-                parkingSpaces.set(spaceNumber, space);
-                break;
-            }
-        }
+        ParkingSpace parkingSpace = parkingSpaces.stream()
+            .filter(space -> Long.valueOf(command.substring(1)).equals(space.getTicket().getTicketNumber()))
+            .findFirst()
+            .orElseThrow(() -> new NoSuchElementException("Car could not be unparked, please check your ticket."));
+
+        int spaceNumber = Integer.parseInt(parkingSpace.getId().substring(1))-1;
+        LOG.info("UNPARKED - Car with license plate: {} from space: {}", parkingSpace.getCar().getLicensePlate(), parkingSpace.getId());
+
+        parkingSpace.setCar(new Car());
+        parkingSpace.setTicket(new Ticket());
+        parkingSpace.setState(false);
+        parkingSpaces.set(spaceNumber, parkingSpace);
     }
 
-    private void compactCarPark(String command) {
-        for (ParkingSpace space : parkingSpaces) {
-            if (!space.getState()) {
-                int spaceNumber = Integer.parseInt(space.getId().substring(1))-1;
-
-            }
-        }
+    /**
+     * Rearranges the car park by parking space status (taken/free)
+     */
+    private void compactCarPark() {
+        LinkedList<ParkingSpace> newParkingSpaces = new LinkedList<>();
+        parkingSpaces.stream().filter(ParkingSpace::getState).forEach(newParkingSpaces::add);
+        parkingSpaces.stream().filter(space -> !space.getState()).forEach(newParkingSpaces::add);
+        newParkingSpaces.forEach(parkingSpace -> parkingSpace.setId("P" + (newParkingSpaces.indexOf(parkingSpace) + 1)));
+        LOG.info("COMPACTED - Car park has been updated.");
+        showAvailability(newParkingSpaces);
     }
 
+    /**
+     * Prints the car park availability
+     * @param spaces
+     */
+    private void showAvailability(LinkedList<ParkingSpace> spaces) {
+        LOG.info("*****CAR PARK AVAILABILITY*****");
+        spaces.forEach(space -> LOG.info("Space: {} - Status: {}", space.getId(), space.getState()?"Taken":"Free"));
+        spaces.forEach(spa -> LOG.info("Space {} ticket {}",spa.getId(), spa.getTicket().getTicketNumber()));
+    }
 }
