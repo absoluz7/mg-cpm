@@ -1,6 +1,5 @@
 package com.domyjob.cpm;
 
-import com.sun.org.apache.xalan.internal.xsltc.util.IntegerArray;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Component;
@@ -12,7 +11,6 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.*;
-import java.util.stream.IntStream;
 import java.util.stream.Stream;
 
 @Service
@@ -21,14 +19,17 @@ public class ParkingService {
     private static Logger LOG = LoggerFactory.getLogger(ParkingService.class);
 
     private long currentTicketNumber = 5000;
+    private final LinkedList<String> parkingIds = new LinkedList<>(Arrays.asList("P1","P2","P3","P4","P5","P6","P7","P8","P9","P10"));
     private LinkedList<ParkingSpace> parkingSpaces;
+    private LinkedHashSet<Long> usedTicketNumbers;
 
     //Initialises empty car park and file reader
     public void initParkingSystem() {
         parkingSpaces = new LinkedList<>();
-        IntStream.range(1, 11).forEach(i -> {
+        usedTicketNumbers = new LinkedHashSet<>();
+        parkingIds.forEach(id -> {
             ParkingSpace parkingSpace = new ParkingSpace();
-            parkingSpace.setId("P" + i);
+            parkingSpace.setId(id);
             parkingSpace.setState(false);
             parkingSpace.setCar(new Car());
             parkingSpace.setTicket(new Ticket());
@@ -68,7 +69,7 @@ public class ParkingService {
             stream = Files.lines(path);
             stream.flatMap(string -> Stream.of(string.split(","))).forEach(parkCommands::add);
         } catch (IOException | URISyntaxException exception) {
-            LOG.info("Encountered problems reading {}, check the error log: /n {}", filePath, exception);
+            LOG.info("Encountered problems reading {}, check the error log: {}", filePath, exception);
         } finally {
             stream.close();
         }
@@ -86,18 +87,18 @@ public class ParkingService {
             .orElseThrow(() -> new NoSuchElementException("Car park full, wait for space to become available."));
 
         int spaceNumber = Integer.parseInt(parkingSpace.getId().substring(1))-1;
+
         Car car = new Car();
         car.setLicensePlate(command.substring(1));
 
         Ticket ticket = new Ticket();
-        ticket.setTicketNumber(currentTicketNumber);
-        currentTicketNumber++;
+        ticket.setTicketNumber(getUniqueTicket());
 
         parkingSpace.setCar(car);
         parkingSpace.setTicket(ticket);
         parkingSpace.setState(true);
         parkingSpaces.set(spaceNumber, parkingSpace);
-        LOG.info("PARKED - Car with license plate: {} in space: {} with ticket number: {}",
+        LOG.info("PARKED - Car plate: {} in space: {} with ticket number: {}",
             parkingSpace.getCar().getLicensePlate(), parkingSpace.getId(), parkingSpace.getTicket().getTicketNumber());
     }
 
@@ -111,13 +112,11 @@ public class ParkingService {
             .findFirst()
             .orElseThrow(() -> new NoSuchElementException("Car could not be unparked, please check your ticket."));
 
-        int spaceNumber = Integer.parseInt(parkingSpace.getId().substring(1))-1;
-        LOG.info("UNPARKED - Car with license plate: {} from space: {}", parkingSpace.getCar().getLicensePlate(), parkingSpace.getId());
+        LOG.info("UNPARKED - Car plate: {} from space: {}", parkingSpace.getCar().getLicensePlate(), parkingSpace.getId());
 
         parkingSpace.setCar(new Car());
         parkingSpace.setTicket(new Ticket());
         parkingSpace.setState(false);
-        parkingSpaces.set(spaceNumber, parkingSpace);
     }
 
     /**
@@ -127,18 +126,32 @@ public class ParkingService {
         LinkedList<ParkingSpace> newParkingSpaces = new LinkedList<>();
         parkingSpaces.stream().filter(ParkingSpace::getState).forEach(newParkingSpaces::add);
         parkingSpaces.stream().filter(space -> !space.getState()).forEach(newParkingSpaces::add);
-        newParkingSpaces.forEach(parkingSpace -> parkingSpace.setId("P" + (newParkingSpaces.indexOf(parkingSpace) + 1)));
-        LOG.info("COMPACTED - Car park has been updated.");
-        showAvailability(newParkingSpaces);
+        parkingSpaces = newParkingSpaces;
+
+        parkingSpaces.forEach(parkingSpace -> parkingSpace.setId(parkingIds.get(parkingSpaces.indexOf(parkingSpace))));
+        LOG.info("COMPACTED - Car Park Update");
+        showAvailability(parkingSpaces);
     }
 
     /**
      * Prints the car park availability
      * @param spaces
      */
-    private void showAvailability(LinkedList<ParkingSpace> spaces) {
-        LOG.info("*****CAR PARK AVAILABILITY*****");
-        spaces.forEach(space -> LOG.info("Space: {} - Status: {}", space.getId(), space.getState()?"Taken":"Free"));
-        spaces.forEach(spa -> LOG.info("Space {} ticket {}",spa.getId(), spa.getTicket().getTicketNumber()));
+    private void showAvailability(List<ParkingSpace> spaces) {
+        LOG.info("======CAR PARK AVAILABILITY======");
+        spaces.forEach(space -> LOG.info("Space: {} - Status: {}", space.getId(), space.getState()?"Taken - Ticket: "
+                + space.getTicket().getTicketNumber():"Free"));
+        LOG.info("=================================");
+    }
+
+    /**
+     * @return unique ticket number
+     */
+    private long getUniqueTicket() {
+        while (usedTicketNumbers.contains(currentTicketNumber)) {
+            currentTicketNumber++;
+        }
+        usedTicketNumbers.add(currentTicketNumber);
+        return currentTicketNumber;
     }
 }
